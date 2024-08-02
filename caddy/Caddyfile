@@ -1,0 +1,8 @@
+:8080 {
+    reverse_proxy http://panel:8080
+}
+
+:8443 {
+    tls /etc/caddy/cert.pem /etc/caddy/key.pem
+    reverse_proxy http://panel:8080
+}

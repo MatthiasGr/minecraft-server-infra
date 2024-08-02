@@ -1,0 +1,97 @@
+---
+- name: Debian deployment for our Minecraft infrastructure services
+  hosts: all
+  become: true
+  tasks:
+    - name: Upgrade the system
+      ansible.builtin.apt:
+        update_cache: true
+        upgrade: true
+
+    - name: Download the docker apt GPG key
+      ansible.builtin.get_url:
+        url: https://download.docker.com/linux/debian/gpg
+        dest: /etc/apt/keyrings/docker.asc
+        mode: "0644"
+
+    - name: Add the docker apt repository
+      ansible.builtin.lineinfile:
+        path: /etc/apt/sources.list.d/docker.list
+        line: deb [signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bookworm stable
+        create: true
+        mode: "0644"
+
+    - name: Install podman and docker compose
+      ansible.builtin.apt:
+        name:
+          - podman
+          - docker-ce-cli
+          - docker-compose-plugin
+        state: present
+        update_cache: true
+
+    - name: Check if the Minecraft service user exists
+      ansible.builtin.command: id minecraft
+      register: minecraft_user_exists
+      ignore_errors: true
+      changed_when: false
+
+    - name: Create the Minecraft service user
+      ansible.builtin.command: useradd -r -F -c "Minecraft Service User" -d /srv/minecraft -m -s /sbin/nologin minecraft
+      when: minecraft_user_exists.rc != 0
+      changed_when: true
+
+    - name: Enable lingering for the Minecraft user
+      ansible.builtin.command: loginctl enable-linger minecraft
+      args:
+        creates: /var/lib/systemd/linger/minecraft
+
+    - name: Add the minecraft user to the systemd-journal group
+      ansible.builtin.user:
+        name: minecraft
+        groups: systemd-journal
+        append: true
+
+    - name: Deploy the Minecraft server infrastructure repository
+      ansible.builtin.git: # noqa: latest
+        repo: file:///share/.git
+        dest: /srv/minecraft/infra
+        accept_newhostkey: true
+
+    - name: Create the Minecraft user service directory
+      ansible.builtin.file:
+        path: /srv/minecraft/.config/systemd/user
+        state: directory
+        owner: minecraft
+        mode: "0755"
+
+    - name: Create the Minecraft infrastructure service
+      ansible.builtin.copy:
+        dest: /srv/minecraft/.config/systemd/user/minecraft-infra.service
+        content: |
+          [Unit]
+          Description=Minecraft Infrastructure Service
+          Requires=podman.socket
+          After=podman.socket
+
+          [Service]
+          WorkingDirectory=/srv/minecraft/infra
+          Environment=DOCKER_HOST=unix:///run/user/%U/podman/podman.sock
+          ExecStart=docker compose up -d --remove-orphans
+          ExecStop=docker compose down
+          Type=oneshot
+          RemainAfterExit=true
+
+          [Install]
+          WantedBy=default.target
+        mode: "0644"
+        owner: minecraft
+
+    - name: Enable the minecraft service
+      become: true
+      become_user: minecraft
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+        name: minecraft-infra.service
+        scope: user
+        enabled: true

@@ -1,0 +1,56 @@
+services:
+  caddy:
+    image: caddy:2.8
+    ports:
+    - 8080:8080
+    - 8443:8443
+    - 8443:8443/udp
+    volumes:
+    - ./caddy:/etc/caddy:ro
+    - caddy-data:/data
+    - caddy-config:/config
+  postgres:
+    image: postgres:16
+    env_file:
+    - .env
+    environment:
+    - POSTGRES_USER=${DB_USER}
+    - POSTGRES_PASSWORD=${DB_PASSWORD}
+    - POSTGRES_DB=${DB_DATABASE}
+    volumes:
+    - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${DB_USER}"]
+      interval: 30s
+      timeout: 30s
+      retries: 10
+      start_period: 30s
+  panel:
+    image: pufferpanel/pufferpanel:3.0.0-alpha.10
+    ports:
+    - 5657:5657
+    env_file:
+    - .env
+    environment:
+    # Base config
+    - PUFFER_CONFIG=/etc/pufferpanel/config.json
+    # Overrides
+    - PUFFER_PANEL_DATABASE_DIALECT=postgresql
+    - PUFFER_PANEL_DATABASE_URL=host=postgres port=5432 sslmode=disable user=$DB_USER password=$DB_PASSWORD dbname=$DB_DATABASE
+    - PUFFER_PANEL_REGISTRATIONENABLED=false
+    - PUFFER_DOCKER_ROOT=/srv/minecraft/.local/share/containers/storage/volumes/infra_panel-data/_data/
+    volumes:
+    - $DOCKER_SOCKET:/var/run/docker.sock
+    - panel-data:/var/lib/pufferpanel
+    - panel-config:/etc/pufferpanel
+    depends_on:
+      postgres:
+        condition: service_healthy
+        restart: true
+
+volumes:
+  caddy-data:
+  caddy-config:
+  postgres-data:
+  panel-data:
+  panel-config:
