@@ -1,10 +1,11 @@
+name: minecraft-infra
 services:
   caddy:
     image: caddy:2.8
     ports:
-    - 8080:8080
-    - 8443:8443
-    - 8443:8443/udp
+    - ${HTTP_PORT:-80}:80
+    - ${HTTPS_PORT:-443}:443
+    - ${HTTPS_PORT:-443}:443/udp
     volumes:
     - ./caddy:/etc/caddy:ro
     - caddy-data:/data
@@ -38,9 +39,9 @@ services:
     - PUFFER_PANEL_DATABASE_DIALECT=postgresql
     - PUFFER_PANEL_DATABASE_URL=host=postgres port=5432 sslmode=disable user=$DB_USER password=$DB_PASSWORD dbname=$DB_DATABASE
     - PUFFER_PANEL_REGISTRATIONENABLED=false
-    - PUFFER_DOCKER_ROOT=/srv/minecraft/.local/share/containers/storage/volumes/infra_panel-data/_data/
+    - PUFFER_DOCKER_ROOT=${STORAGE_ROOT:-/var/lib/docker}/volumes/minecraft-infra_panel-data/_data/
     volumes:
-    - $DOCKER_SOCKET:/var/run/docker.sock
+    - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
     - panel-data:/var/lib/pufferpanel
     - panel-config:/etc/pufferpanel
     depends_on:

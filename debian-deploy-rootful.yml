@@ -1,0 +1,62 @@
+---
+- name: Debian deployment for the Minecraft infrastructure services (rootful)
+  hosts: all
+  become: true
+  tasks:
+    - name: Upgrade the system
+      ansible.builtin.apt:
+        update_cache: true
+        upgrade: true
+
+    - name: Download the docker apt GPG key
+      ansible.builtin.get_url:
+        url: https://download.docker.com/linux/debian/gpg
+        dest: /etc/apt/keyrings/docker.asc
+        mode: "0644"
+
+    - name: Add the docker apt repository
+      ansible.builtin.lineinfile:
+        path: /etc/apt/sources.list.d/docker.list
+        line: deb [signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bookworm stable
+        create: true
+        mode: "0644"
+
+    - name: Install docker and docker compose
+      ansible.builtin.apt:
+        name:
+          - containerd.io
+          - docker-ce
+          - docker-ce-cli
+          - docker-compose-plugin
+        state: present
+        update_cache: true
+
+    - name: Deploy the Minecraft server infrastructure repository
+      ansible.builtin.git: # noqa: latest
+        repo: file:///share/.git
+        dest: /srv/minecraft-infra
+        accept_newhostkey: true
+
+    - name: Create the Minecraft infrastructure service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/minecraft-infra.service
+        content: |
+          [Unit]
+          Description=Minecraft Infrastructure Service
+          Requires=docker.socket
+          After=docker.socket
+
+          [Service]
+          WorkingDirectory=/srv/minecraft-infra
+          ExecStart=docker compose up --remove-orphans
+
+          [Install]
+          WantedBy=multi-user.target
+        mode: "0644"
+        owner: root
+
+    - name: Enable the minecraft service
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+        name: minecraft-infra.service
+        enabled: true

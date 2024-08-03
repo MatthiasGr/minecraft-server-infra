@@ -1,5 +1,5 @@
 ---
-- name: Debian deployment for our Minecraft infrastructure services
+- name: Debian deployment for the Minecraft infrastructure services (rootless)
   hosts: all
   become: true
   tasks:
