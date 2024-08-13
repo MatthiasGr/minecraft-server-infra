@@ -27,7 +27,7 @@ services:
       retries: 10
       start_period: 30s
   panel:
-    image: pufferpanel/pufferpanel:3.0.0-alpha.10
+    image: pufferpanel/pufferpanel:3.0.0-rc.1
     ports:
     - 5657:5657
     env_file:
