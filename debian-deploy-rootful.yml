@@ -33,7 +33,7 @@
 
     - name: Deploy the Minecraft server infrastructure repository
       ansible.builtin.git: # noqa: latest
-        repo: file:///share/.git
+        repo: https://github.com/MatthiasGr/minecraft-server-infra.git
         dest: /srv/minecraft-infra
         accept_newhostkey: true
 
